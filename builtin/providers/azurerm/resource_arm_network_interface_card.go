@@ -53,6 +53,11 @@ func resourceArmNetworkInterface() *schema.Resource {
 				Computed: true,
 			},
 
+			"private_ip_address": &schema.Schema{
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+
 			"virtual_machine_id": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -140,6 +145,12 @@ func resourceArmNetworkInterface() *schema.Resource {
 				Computed: true,
 			},
 
+			"enable_ip_forwarding": &schema.Schema{
+				Type:     schema.TypeBool,
+				Optional: true,
+				Default:  false,
+			},
+
 			"tags": tagsSchema(),
 		},
 	}
@@ -154,9 +165,12 @@ func resourceArmNetworkInterfaceCreate(d *schema.ResourceData, meta interface{})
 	name := d.Get("name").(string)
 	location := d.Get("location").(string)
 	resGroup := d.Get("resource_group_name").(string)
+	enableIpForwarding := d.Get("enable_ip_forwarding").(bool)
 	tags := d.Get("tags").(map[string]interface{})
 
-	properties := network.InterfacePropertiesFormat{}
+	properties := network.InterfacePropertiesFormat{
+		EnableIPForwarding: &enableIpForwarding,
+	}
 
 	if v, ok := d.GetOk("network_security_group_id"); ok {
 		nsgId := v.(string)
@@ -241,7 +255,7 @@ func resourceArmNetworkInterfaceRead(d *schema.ResourceData, meta interface{}) e
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("Error making Read request on Azure Netowkr Interface %s: %s", name, err)
+		return fmt.Errorf("Error making Read request on Azure Network Interface %s: %s", name, err)
 	}
 
 	iface := *resp.Properties
@@ -249,6 +263,18 @@ func resourceArmNetworkInterfaceRead(d *schema.ResourceData, meta interface{}) e
 	if iface.MacAddress != nil {
 		if *iface.MacAddress != "" {
 			d.Set("mac_address", iface.MacAddress)
+		}
+	}
+
+	if iface.IPConfigurations != nil && len(*iface.IPConfigurations) > 0 {
+		var privateIPAddress *string
+		///TODO: Change this to a loop when https://github.com/Azure/azure-sdk-for-go/issues/259 is fixed
+		if (*iface.IPConfigurations)[0].Properties != nil {
+			privateIPAddress = (*iface.IPConfigurations)[0].Properties.PrivateIPAddress
+		}
+
+		if *privateIPAddress != "" {
+			d.Set("private_ip_address", *privateIPAddress)
 		}
 	}
 
@@ -311,7 +337,13 @@ func resourceArmNetworkInterfaceIpConfigurationHash(v interface{}) int {
 	m := v.(map[string]interface{})
 	buf.WriteString(fmt.Sprintf("%s-", m["name"].(string)))
 	buf.WriteString(fmt.Sprintf("%s-", m["subnet_id"].(string)))
+	if m["private_ip_address"] != nil {
+		buf.WriteString(fmt.Sprintf("%s-", m["private_ip_address"].(string)))
+	}
 	buf.WriteString(fmt.Sprintf("%s-", m["private_ip_address_allocation"].(string)))
+	if m["public_ip_address_id"] != nil {
+		buf.WriteString(fmt.Sprintf("%s-", m["public_ip_address_id"].(string)))
+	}
 
 	return hashcode.String(buf.String())
 }

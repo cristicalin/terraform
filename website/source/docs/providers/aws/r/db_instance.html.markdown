@@ -58,7 +58,7 @@ The following arguments are supported:
 * `final_snapshot_identifier` - (Optional) The name of your final DB snapshot
     when this DB instance is deleted. If omitted, no final snapshot will be
     made.
-* `skip_final_snapshot` - (Optional) Determines whether a final DB snapshot is created before the DB instance is deleted. If true is specified, no DBSnapshot is created. If false is specified, a DB snapshot is created before the DB instance is deleted. Default is true.
+* `skip_final_snapshot` - (Optional) Determines whether a final DB snapshot is created before the DB instance is deleted. If true is specified, no DBSnapshot is created. If false is specified, a DB snapshot is created before the DB instance is deleted, using the value from `final_snapshot_identifier`. Default is true.
 * `copy_tags_to_snapshot` – (Optional, boolean) On delete, copy all Instance `tags` to
 the final snapshot (if `final_snapshot_identifier` is specified). Default
 `false`
@@ -102,6 +102,7 @@ database, and to use this value as the source database. This correlates to the
 enhanced monitoring metrics to CloudWatch Logs. You can find more information on the [AWS Documentation](http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.html) 
 what IAM permissions are needed to allow Enhanced Monitoring for RDS Instances.
 * `monitoring_interval` - (Optional) The interval, in seconds, between points when Enhanced Monitoring metrics are collected for the DB instance. To disable collecting Enhanced Monitoring metrics, specify 0. The default is 0. Valid Values: 0, 1, 5, 10, 15, 30, 60.
+* `kms_key_id` - (Optional) The ARN for the KMS encryption key. 
 * `tags` - (Optional) A mapping of tags to assign to the resource.
 
 ~> **NOTE:** Removing the `replicate_source_db` attribute from an existing RDS

@@ -391,8 +391,8 @@ func resourceComputeInstanceV2Create(d *schema.ResourceData, meta interface{}) e
 	if vL, ok := d.GetOk("block_device"); ok {
 		blockDevices := resourceInstanceBlockDevicesV2(d, vL.([]interface{}))
 		createOpts = &bootfromvolume.CreateOptsExt{
-			createOpts,
-			blockDevices,
+			CreateOptsBuilder: createOpts,
+			BlockDevice:       blockDevices,
 		}
 	}
 
@@ -678,12 +678,14 @@ func resourceComputeInstanceV2Update(d *schema.ResourceData, meta interface{}) e
 			}
 
 			// Only changes to the floating IP are supported
-			if oldFIP != "" && newFIP != "" && oldFIP != newFIP {
+			if oldFIP != "" && oldFIP != newFIP {
 				log.Printf("[DEBUG] Attempting to disassociate %s from %s", oldFIP, d.Id())
 				if err := disassociateFloatingIPFromInstance(computeClient, oldFIP, d.Id(), oldFixedIP); err != nil {
 					return fmt.Errorf("Error disassociating Floating IP during update: %s", err)
 				}
+			}
 
+			if newFIP != "" && oldFIP != newFIP {
 				log.Printf("[DEBUG] Attempting to associate %s to %s", newFIP, d.Id())
 				if err := associateFloatingIPToInstance(computeClient, newFIP, d.Id(), newFixedIP); err != nil {
 					return fmt.Errorf("Error associating Floating IP during update: %s", err)
@@ -700,9 +702,9 @@ func resourceComputeInstanceV2Update(d *schema.ResourceData, meta interface{}) e
 
 		// old attachments and new attachments
 		oldAttachments, newAttachments := d.GetChange("volume")
-
 		// for each old attachment, detach the volume
 		oldAttachmentSet := oldAttachments.(*schema.Set).List()
+
 		if blockClient, err := config.blockStorageV1Client(d.Get("region").(string)); err != nil {
 			return err
 		} else {
@@ -753,7 +755,7 @@ func resourceComputeInstanceV2Update(d *schema.ResourceData, meta interface{}) e
 			Pending:    []string{"RESIZE"},
 			Target:     []string{"VERIFY_RESIZE"},
 			Refresh:    ServerV2StateRefreshFunc(computeClient, d.Id()),
-			Timeout:    3 * time.Minute,
+			Timeout:    30 * time.Minute,
 			Delay:      10 * time.Second,
 			MinTimeout: 3 * time.Second,
 		}
@@ -774,7 +776,7 @@ func resourceComputeInstanceV2Update(d *schema.ResourceData, meta interface{}) e
 			Pending:    []string{"VERIFY_RESIZE"},
 			Target:     []string{"ACTIVE"},
 			Refresh:    ServerV2StateRefreshFunc(computeClient, d.Id()),
-			Timeout:    3 * time.Minute,
+			Timeout:    30 * time.Minute,
 			Delay:      10 * time.Second,
 			MinTimeout: 3 * time.Second,
 		}
@@ -856,6 +858,7 @@ func resourceInstanceSecGroupsV2(d *schema.ResourceData) []string {
 // and aggregates it all together.
 func getInstanceNetworksAndAddresses(computeClient *gophercloud.ServiceClient, d *schema.ResourceData) ([]map[string]interface{}, error) {
 	server, err := servers.Get(computeClient, d.Id()).Extract()
+
 	if err != nil {
 		return nil, CheckDeleted(d, err, "server")
 	}
